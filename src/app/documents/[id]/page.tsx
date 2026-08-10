@@ -33,7 +33,7 @@ export default async function DocumentPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-[1800px] px-4 py-6">
         <Link
           href="/"
           className="text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
