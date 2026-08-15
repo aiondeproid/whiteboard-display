@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `あなたは社内掲示板サイトのチャットアシ
 分からないことは正直に分からないと答え、憶測で断定しないでください。`;
 
 const MAX_MESSAGES = 20;
-const MAX_CONTENT_LENGTH = 2000;
+const MAX_CONTENT_LENGTH = 4000;
 
 type ChatMessage = {
   role: "user" | "assistant";

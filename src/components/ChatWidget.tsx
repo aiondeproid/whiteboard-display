@@ -35,6 +35,9 @@ export default function ChatWidget() {
         signal: controller.signal,
       });
 
+      if (response.status === 400) {
+        throw new Error("質問が長すぎるか、内容に問題があります。文章を短くしてもう一度お試しください。");
+      }
       if (!response.ok || !response.body) {
         throw new Error(`Request failed: ${response.status}`);
       }
@@ -55,13 +58,14 @@ export default function ChatWidget() {
       }
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
+        const message =
+          error instanceof Error && error.message.length > 0 && !error.message.startsWith("Request failed:")
+            ? error.message
+            : "通信エラーが発生しました。もう一度お試しください。";
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
-          updated[updated.length - 1] = {
-            ...last,
-            content: last.content || "通信エラーが発生しました。もう一度お試しください。",
-          };
+          updated[updated.length - 1] = { ...last, content: last.content || message };
           return updated;
         });
       }
