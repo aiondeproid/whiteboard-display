@@ -32,18 +32,20 @@ export default async function DocumentPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <main className="mx-auto max-w-[1800px] px-4 py-6">
-        <Link
-          href="/"
-          className="text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          ← 一覧に戻る
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-          {doc.title}
-        </h1>
-        <div className="mt-6">
+    <div className="flex h-dvh flex-col bg-zinc-50 dark:bg-black">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col px-4 py-6">
+        <div className="shrink-0">
+          <Link
+            href="/"
+            className="text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            ← 一覧に戻る
+          </Link>
+          <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+            {doc.title}
+          </h1>
+        </div>
+        <div className="mt-6 min-h-0 flex-1">
           <PdfViewerLoader fileUrl={signedUrlData.signedUrl} />
         </div>
       </main>

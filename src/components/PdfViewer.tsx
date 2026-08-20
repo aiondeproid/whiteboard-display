@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
+import type { PageCallback } from "react-pdf/dist/shared/types.js";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "@/lib/pdf-worker";
@@ -16,7 +17,11 @@ const SCALE_STEP = 0.25;
 
 export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number>();
+  const [containerSize, setContainerSize] = useState<{
+    width: number;
+    height: number;
+  }>();
+  const [pageAspectRatio, setPageAspectRatio] = useState<number>();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1);
@@ -25,18 +30,28 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width) setContainerWidth(width);
+      const { width, height } = entries[0]?.contentRect ?? {};
+      if (width && height) setContainerSize({ width, height });
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
+  // scale=1 fits the whole page inside the container (one page per screen);
+  // the manual zoom controls then multiply on top of that fit width.
+  const fitWidth =
+    containerSize && pageAspectRatio
+      ? Math.min(
+          containerSize.width,
+          containerSize.height * pageAspectRatio,
+        )
+      : undefined;
+
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <div
         ref={containerRef}
-        className="max-h-[90vh] overflow-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
       >
         <Document
           file={fileUrl}
@@ -55,12 +70,15 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         >
           <Page
             pageNumber={pageNumber}
-            width={containerWidth ? containerWidth * scale : undefined}
+            width={fitWidth ? fitWidth * scale : undefined}
+            onLoadSuccess={(page: PageCallback) =>
+              setPageAspectRatio(page.originalWidth / page.originalHeight)
+            }
           />
         </Document>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+      <div className="mt-4 shrink-0 flex flex-wrap items-center justify-center gap-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
