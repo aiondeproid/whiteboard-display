@@ -47,17 +47,25 @@ export async function POST(request: Request) {
     instructions: SYSTEM_PROMPT,
     input: messages,
     max_output_tokens: 1024,
+    reasoning: { effort: "low" },
     stream: true,
   });
 
   const encoder = new TextEncoder();
   const body_ = new ReadableStream({
     async start(controller) {
+      let sentAny = false;
       try {
         for await (const event of stream) {
           if (event.type === "response.output_text.delta") {
+            sentAny = true;
             controller.enqueue(encoder.encode(event.delta));
           }
+        }
+        if (!sentAny) {
+          controller.enqueue(
+            encoder.encode("すみません、回答を生成できませんでした。質問を短くしてもう一度お試しください。")
+          );
         }
       } catch (error) {
         console.error("Chat stream error:", error);
