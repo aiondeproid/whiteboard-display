@@ -15,6 +15,16 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const SCALE_STEP = 0.25;
 
+function clampScale(value: number) {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+}
+
+function touchDistance(touches: TouchList) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
 export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState<{
@@ -25,6 +35,11 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1);
+  const scaleRef = useRef(scale);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -35,6 +50,48 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     });
     observer.observe(el);
     return () => observer.disconnect();
+  }, []);
+
+  // Two-finger pinch zoom for touch panel displays. `touch-action: pan-x
+  // pan-y` on the container (below) stops the browser's own page-zoom
+  // gesture from firing at the same time, so this is the only zoom path
+  // for touch input.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchStartDistance = touchDistance(e.touches);
+        pinchStartScale = scaleRef.current;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStartDistance > 0) {
+        e.preventDefault();
+        const ratio = touchDistance(e.touches) / pinchStartDistance;
+        setScale(clampScale(+(pinchStartScale * ratio).toFixed(2)));
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchStartDistance = 0;
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: false });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd);
+    el.addEventListener("touchcancel", handleTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, []);
 
   // scale=1 fits the whole page inside the container (one page per screen);
@@ -52,6 +109,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       <div
         ref={containerRef}
         className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+        style={{ touchAction: "pan-x pan-y" }}
       >
         <Document
           file={fileUrl}
