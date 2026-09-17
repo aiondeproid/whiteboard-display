@@ -15,7 +15,6 @@
 - 資料の公開/非公開は編集アプリ側の`visible`フラグで制御し、本アプリは`visible = true`の資料のみを表示すること
 - 表示対象の掲示板は環境変数（`DISPLAY_BOARD_ID`）で1つに固定すること
 - 資料の実体（PDFファイル）はSupabase Storageに保存し、閲覧時のみ有効期限付きの署名付きURLを発行すること
-- 掲示板の使い方などの簡単な質問にAIチャットで答えられること
 - 資料の編集・アップロード・削除機能は持たない（読み取り専用）こと
 
 ## 機能一覧
@@ -24,7 +23,6 @@
 - **PDFサムネイル表示**: 一覧画面で各資料の1ページ目をサムネイルとして表示
 - **資料詳細・PDFビューア**: 資料をクリックすると詳細ページでPDF全体を閲覧可能
 - **署名付きURLによる安全な配信**: Supabase Storageの資料に対し、有効期限（5分間）付きの署名付きURLを都度発行
-- **AIチャットウィジェット**: 画面右下のチャットボタンから、掲示板の使い方などをAIアシスタントに質問可能（ストリーミング応答対応）
 - **ダークモード対応**: OSのカラースキームに応じたライト/ダーク表示
 
 ## 使用フレームワーク・ライブラリ
@@ -45,20 +43,18 @@
 | サービス | 用途 |
 | --- | --- |
 | [Supabase](https://supabase.com/) | 資料メタデータ（`boards` / `departments` / `documents`）のDB、PDF実体を保存するStorage、署名付きURLの発行 |
-| [OpenAI API](https://platform.openai.com/) | チャットウィジェットの応答生成（`gpt-5-nano`、Responses APIのストリーミングを使用） |
 
 ## Getting Started
 
 ### 1. 環境変数の設定
 
-`.env.local` を作成し、以下を設定してください（実際の値はSupabase / OpenAIの管理画面から取得します）。
+`.env.local` を作成し、以下を設定してください（実際の値はSupabaseの管理画面から取得します）。
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 DISPLAY_BOARD_ID=
-OPENAI_API_KEY=
 ```
 
 ### 2. 開発サーバーの起動

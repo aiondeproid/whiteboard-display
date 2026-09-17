@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import ChatWidget from "@/components/ChatWidget";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,7 +25,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <ChatWidget />
       </body>
     </html>
   );
