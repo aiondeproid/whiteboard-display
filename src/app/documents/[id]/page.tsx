@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import PdfViewerLoader from "@/components/PdfViewerLoader";
+import { todayInTokyo } from "@/lib/display";
 
 const BOARD_ID = process.env.DISPLAY_BOARD_ID;
 const SIGNED_URL_EXPIRES_IN_SECONDS = 300;
@@ -14,12 +15,21 @@ export default async function DocumentPage({ params }: PageProps) {
   const { id } = await params;
 
   const { data: doc, error } = await supabaseAdmin
-    .from("documents")
-    .select("id, board_id, title, storage_path, visible")
+    .from("display_documents")
+    .select("id, board_id, title, storage_path, visible, display_start, display_end")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  if (error || !doc || doc.board_id !== BOARD_ID || !doc.visible) {
+  // service role は RLS をバイパスするので、一覧と同じく表示中・期間内かをここで確認する（削除済みはビューで除外済み）。
+  const today = todayInTokyo();
+  if (
+    error ||
+    !doc ||
+    doc.board_id !== BOARD_ID ||
+    !doc.visible ||
+    (doc.display_start && doc.display_start > today) ||
+    (doc.display_end && doc.display_end < today)
+  ) {
     notFound();
   }
 

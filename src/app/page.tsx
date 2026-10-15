@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import PdfThumbnailLoader from "@/components/PdfThumbnailLoader";
+import { CATEGORIES, DOCUMENT_COLUMNS, todayInTokyo } from "@/lib/display";
 import type { Department, DepartmentWithDocuments, Document } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,9 @@ async function getDepartmentsWithDocuments(): Promise<{
     throw new Error("Missing DISPLAY_BOARD_ID env var");
   }
 
+  // service role は RLS をバイパスするので、viewer 向け RLS と同じ条件（表示中・期間内）をここで絞り込む。
+  const today = todayInTokyo();
+
   const [{ data: board, error: boardError }, { data: departments, error: departmentsError }, { data: documents, error: documentsError }] =
     await Promise.all([
       supabaseAdmin.from("boards").select("name").eq("id", BOARD_ID).single(),
@@ -54,11 +58,15 @@ async function getDepartmentsWithDocuments(): Promise<{
         .select("id, slug, name, sort_order")
         .order("sort_order", { ascending: true }),
       supabaseAdmin
-        .from("documents")
-        .select("id, board_id, department_id, title, storage_path, visible, created_at, updated_at")
+        .from("display_documents")
+        .select(DOCUMENT_COLUMNS)
         .eq("board_id", BOARD_ID)
         .eq("visible", true)
-        .order("created_at", { ascending: false }),
+        .or(`display_start.is.null,display_start.lte.${today}`)
+        .or(`display_end.is.null,display_end.gte.${today}`)
+        .order("pinned", { ascending: false })
+        .order("created_at", { ascending: false })
+        .returns<Document[]>(),
     ]);
 
   if (boardError) throw boardError;
@@ -113,12 +121,37 @@ export default async function Home() {
                     <li key={doc.id}>
                       <Link
                         href={`/documents/${doc.id}`}
-                        className="flex flex-col rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition hover:border-zinc-400 hover:shadow dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
+                        className={`relative flex flex-col rounded-lg border bg-white p-3 shadow-sm transition hover:shadow dark:bg-zinc-900 ${
+                          doc.pinned
+                            ? "border-amber-400 hover:border-amber-500 dark:border-amber-600 dark:hover:border-amber-500"
+                            : "border-zinc-200 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                        }`}
                       >
+                        {doc.pinned && (
+                          <span className="absolute right-2 top-2 z-10 text-base" aria-label="ピン留め">
+                            📌
+                          </span>
+                        )}
                         {thumbnailUrls.has(doc.id) ? (
                           <PdfThumbnailLoader fileUrl={thumbnailUrls.get(doc.id)!} />
                         ) : (
                           <div className="aspect-[3/4] w-full rounded-md border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-800" />
+                        )}
+                        {(doc.category || doc.is_new) && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {doc.category && (
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-xs font-medium ${CATEGORIES[doc.category].className}`}
+                              >
+                                {CATEGORIES[doc.category].label}
+                              </span>
+                            )}
+                            {doc.is_new && (
+                              <span className="rounded bg-blue-600 px-1.5 py-0.5 text-xs font-bold text-white">
+                                NEW
+                              </span>
+                            )}
+                          </div>
                         )}
                         <p className="mt-2 truncate font-medium text-zinc-900 dark:text-zinc-50">
                           {doc.title}
