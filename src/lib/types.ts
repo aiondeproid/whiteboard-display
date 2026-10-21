@@ -28,3 +28,15 @@ export type Document = {
 export type DepartmentWithDocuments = Department & {
   documents: Document[];
 };
+
+// スライドショーで1枚ずつ表示する資料。url は表示の都度発行する署名付きURL。
+export type Slide = {
+  id: string;
+  title: string;
+  departmentName: string;
+  category: DocumentCategory | null;
+  is_new: boolean;
+  url: string;
+  position: number;
+  total: number;
+};
