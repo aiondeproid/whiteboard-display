@@ -8,6 +8,7 @@ import { getNextSlide } from "@/app/slideshow/actions";
 import { CATEGORIES } from "@/lib/display";
 import type { Slide } from "@/lib/types";
 import "@/lib/pdf-worker";
+import { useFullscreen } from "@/lib/use-fullscreen";
 
 // 1資料あたりの表示時間。複数ページの資料はこの時間をページ数で等分してめくる。
 const SLIDE_MS = 10 * 60 * 1000;
@@ -39,6 +40,12 @@ export default function Slideshow() {
     height: number;
   }>();
   const containerRef = useRef<HTMLDivElement>(null);
+  const {
+    ref: rootRef,
+    isFullscreen,
+    enter: enterFullscreen,
+    exit: exitFullscreen,
+  } = useFullscreen<HTMLDivElement>();
   const advancingRef = useRef(false);
   // 1秒ごとの tick から最新の値を読むための ref（state と同時に更新する）。
   const deadlineRef = useRef(0);
@@ -112,8 +119,23 @@ export default function Slideshow() {
       : undefined;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+    <div
+      ref={rootRef}
+      className={`flex min-h-0 flex-1 flex-col ${
+        isFullscreen ? "fixed inset-0 z-50 bg-black" : "px-4 py-4"
+      }`}
+    >
+      {/* 全画面中はヘッダーを隠し、終了ボタンだけを右上に小さく重ねる（自動送りはそのまま続く）。 */}
+      {isFullscreen && (
+        <button
+          type="button"
+          onClick={exitFullscreen}
+          className="absolute right-3 top-3 z-10 rounded-md bg-black/50 px-3 py-1.5 text-sm text-zinc-200 opacity-60 hover:opacity-100"
+        >
+          全画面を終了
+        </button>
+      )}
+      <header className={`${isFullscreen ? "hidden" : "flex"} shrink-0 flex-wrap items-center justify-between gap-3`}>
         <div className="min-w-0">
           {slide ? (
             <>
@@ -164,6 +186,13 @@ export default function Slideshow() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            onClick={enterFullscreen}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 dark:border-zinc-700"
+          >
+            全画面
+          </button>
           <Link
             href="/"
             className="rounded-md bg-zinc-900 px-4 py-1.5 font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
@@ -175,7 +204,11 @@ export default function Slideshow() {
 
       <div
         ref={containerRef}
-        className="mt-4 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+        className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
+          isFullscreen
+            ? "bg-black"
+            : "mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+        }`}
       >
         {status === "loading" && <p className="text-zinc-500">読み込み中...</p>}
         {status === "empty" && (
@@ -217,7 +250,11 @@ export default function Slideshow() {
       </div>
 
       {status === "ready" && (
-        <div className="mt-3 h-1 shrink-0 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-800">
+        <div
+          className={`h-1 shrink-0 overflow-hidden ${
+            isFullscreen ? "bg-zinc-900" : "mt-3 rounded bg-zinc-200 dark:bg-zinc-800"
+          }`}
+        >
           <div
             className="h-full bg-zinc-500 transition-[width] duration-1000 ease-linear"
             style={{ width: `${Math.min(100, (elapsed / SLIDE_MS) * 100)}%` }}

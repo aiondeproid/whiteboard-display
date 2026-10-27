@@ -6,6 +6,7 @@ import type { PageCallback } from "react-pdf/dist/shared/types.js";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "@/lib/pdf-worker";
+import { useFullscreen } from "@/lib/use-fullscreen";
 
 type PdfViewerProps = {
   fileUrl: string;
@@ -26,9 +27,13 @@ function touchDistance(touches: TouchList) {
 }
 
 export default function PdfViewer({ fileUrl }: PdfViewerProps) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const {
+    ref: wrapperRef,
+    isFullscreen,
+    enter: enterFullscreen,
+    exit: exitFullscreen,
+  } = useFullscreen<HTMLDivElement>();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [containerSize, setContainerSize] = useState<{
     width: number;
     height: number;
@@ -54,22 +59,11 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    // Leaving browser fullscreen (e.g. with Esc) also leaves our mode.
-    const handleChange = () => {
-      if (!document.fullscreenElement) setIsFullscreen(false);
-    };
-    document.addEventListener("fullscreenchange", handleChange);
-    return () => document.removeEventListener("fullscreenchange", handleChange);
-  }, []);
-
   // Keyboard paging like a presentation: arrows / PageUp / PageDown / Space.
   useEffect(() => {
     if (!numPages) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsFullscreen(false);
-      } else if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) {
+      if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) {
         e.preventDefault();
         setPageNumber((p) => Math.min(numPages, p + 1));
       } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) {
@@ -81,20 +75,12 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [numPages]);
 
-  // The viewer always fills the window while in this mode (fixed overlay),
-  // and additionally asks the browser for real fullscreen. That request can
-  // be refused (no element fullscreen on iPhone Safari, no user gesture,
-  // kiosk policy), in which case the window-filling overlay still works.
   const toggleFullscreen = () => {
     if (isFullscreen) {
-      setIsFullscreen(false);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      exitFullscreen();
     } else {
-      setIsFullscreen(true);
       setScale(1);
-      if (document.fullscreenEnabled) {
-        wrapperRef.current?.requestFullscreen().catch(() => {});
-      }
+      enterFullscreen();
     }
   };
 
