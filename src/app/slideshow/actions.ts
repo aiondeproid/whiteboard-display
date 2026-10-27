@@ -7,18 +7,27 @@ import type { Slide } from "@/lib/types";
 // 1枚の表示時間（10分）より長くしておく。pdf.js は表示中にページ範囲を取り直すことがある。
 const SIGNED_URL_EXPIRES_IN_SECONDS = 15 * 60;
 
-// afterId の次の資料を返す（null・末尾・既に表示対象外なら先頭から）。
+// fromId の次（direction = -1 なら前）の資料を返す。末尾の次は先頭、先頭の前は末尾に回る。
+// fromId が null・既に表示対象外なら、次は先頭から、前は末尾から。
 // 毎回一覧を取り直すので、スライドショー中の追加・非表示・期間切れもそのまま反映される。
-export async function getNextSlide(afterId: string | null): Promise<Slide | null> {
+export async function getNextSlide(
+  fromId: string | null,
+  direction: 1 | -1 = 1
+): Promise<Slide | null> {
   const { departments } = await getDepartmentsWithDocuments();
   const slides = departments.flatMap((department) =>
     department.documents.map((doc) => ({ doc, departmentName: department.name }))
   );
   if (slides.length === 0) return null;
 
-  const afterIndex =
-    typeof afterId === "string" ? slides.findIndex(({ doc }) => doc.id === afterId) : -1;
-  const index = (afterIndex + 1) % slides.length;
+  const fromIndex =
+    typeof fromId === "string" ? slides.findIndex(({ doc }) => doc.id === fromId) : -1;
+  const index =
+    fromIndex === -1
+      ? direction === 1
+        ? 0
+        : slides.length - 1
+      : (fromIndex + direction + slides.length) % slides.length;
   const { doc, departmentName } = slides[index];
 
   const { data, error } = await supabaseAdmin.storage

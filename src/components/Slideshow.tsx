@@ -56,11 +56,11 @@ export default function Slideshow() {
     setDeadline(time);
   }, []);
 
-  const advance = useCallback(async (afterId: string | null) => {
+  const advance = useCallback(async (fromId: string | null, direction: 1 | -1 = 1) => {
     if (advancingRef.current) return;
     advancingRef.current = true;
     try {
-      const next = await getNextSlide(afterId);
+      const next = await getNextSlide(fromId, direction);
       const fetchedAt = Date.now();
       setNow(fetchedAt);
       slideIdRef.current = next?.id ?? null;
@@ -95,6 +95,22 @@ export default function Slideshow() {
     return () => clearInterval(timer);
   }, [advance]);
 
+  // 手動送り。送った資料からまた10分のタイマーが始まる。
+  // キーボード（矢印・PageUp/PageDown・スペース）でも、プレゼンのリモコンのように送れる。
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) {
+        e.preventDefault();
+        void advance(slideIdRef.current, 1);
+      } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) {
+        e.preventDefault();
+        void advance(slideIdRef.current, -1);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [advance]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -125,15 +141,40 @@ export default function Slideshow() {
         isFullscreen ? "fixed inset-0 z-50 bg-black" : "px-4 py-4"
       }`}
     >
-      {/* 全画面中はヘッダーを隠し、終了ボタンだけを右上に小さく重ねる（自動送りはそのまま続く）。 */}
+      {/* 全画面中はヘッダーを隠し、終了ボタンと前後の送りボタンだけを小さく重ねる（自動送りはそのまま続く）。 */}
       {isFullscreen && (
-        <button
-          type="button"
-          onClick={exitFullscreen}
-          className="absolute right-3 top-3 z-10 rounded-md bg-black/50 px-3 py-1.5 text-sm text-zinc-200 opacity-60 hover:opacity-100"
-        >
-          全画面を終了
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={exitFullscreen}
+            className="absolute right-3 top-3 z-10 rounded-md bg-black/50 px-3 py-1.5 text-sm text-zinc-200 opacity-60 hover:opacity-100"
+          >
+            全画面を終了
+          </button>
+          {slide && status === "ready" && (
+            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 px-3 py-2 text-sm text-zinc-200 opacity-60 hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => void advance(slide.id, -1)}
+                aria-label="前の資料"
+                className="rounded-full px-4 py-2 text-lg hover:bg-white/10"
+              >
+                ◀ 前へ
+              </button>
+              <span className="tabular-nums">
+                {slide.position} / {slide.total}
+              </span>
+              <button
+                type="button"
+                onClick={() => void advance(slide.id, 1)}
+                aria-label="次の資料"
+                className="rounded-full px-4 py-2 text-lg hover:bg-white/10"
+              >
+                次へ ▶
+              </button>
+            </div>
+          )}
+        </>
       )}
       <header className={`${isFullscreen ? "hidden" : "flex"} shrink-0 flex-wrap items-center justify-between gap-3`}>
         <div className="min-w-0">
@@ -179,7 +220,14 @@ export default function Slideshow() {
               <span className="tabular-nums">次まで {formatRemaining(remaining)}</span>
               <button
                 type="button"
-                onClick={() => void advance(slide.id)}
+                onClick={() => void advance(slide.id, -1)}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 dark:border-zinc-700"
+              >
+                前へ
+              </button>
+              <button
+                type="button"
+                onClick={() => void advance(slide.id, 1)}
                 className="rounded-md border border-zinc-300 px-3 py-1.5 dark:border-zinc-700"
               >
                 次へ
