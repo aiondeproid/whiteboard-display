@@ -26,7 +26,9 @@ function touchDistance(touches: TouchList) {
 }
 
 export default function PdfViewer({ fileUrl }: PdfViewerProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [containerSize, setContainerSize] = useState<{
     width: number;
     height: number;
@@ -51,6 +53,61 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    // Leaving browser fullscreen (e.g. with Esc) also leaves our mode.
+    const handleChange = () => {
+      if (!document.fullscreenElement) setIsFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", handleChange);
+    return () => document.removeEventListener("fullscreenchange", handleChange);
+  }, []);
+
+  // Keyboard paging like a presentation: arrows / PageUp / PageDown / Space.
+  useEffect(() => {
+    if (!numPages) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false);
+      } else if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) {
+        e.preventDefault();
+        setPageNumber((p) => Math.min(numPages, p + 1));
+      } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) {
+        e.preventDefault();
+        setPageNumber((p) => Math.max(1, p - 1));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [numPages]);
+
+  // The viewer always fills the window while in this mode (fixed overlay),
+  // and additionally asks the browser for real fullscreen. That request can
+  // be refused (no element fullscreen on iPhone Safari, no user gesture,
+  // kiosk policy), in which case the window-filling overlay still works.
+  const toggleFullscreen = () => {
+    if (isFullscreen) {
+      setIsFullscreen(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    } else {
+      setIsFullscreen(true);
+      setScale(1);
+      if (document.fullscreenEnabled) {
+        wrapperRef.current?.requestFullscreen().catch(() => {});
+      }
+    }
+  };
+
+  // In fullscreen, tapping the left / right third of the screen turns the
+  // page, so a touch panel can be used like a slide presentation. Only at
+  // the fitted zoom level, where there is nothing to scroll.
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isFullscreen || scale !== 1 || !numPages) return;
+    const { left, width } = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - left) / width;
+    if (x < 1 / 3) setPageNumber((p) => Math.max(1, p - 1));
+    else if (x > 2 / 3) setPageNumber((p) => Math.min(numPages, p + 1));
+  };
 
   // Two-finger pinch zoom for touch panel displays. `touch-action: pan-x
   // pan-y` on the container (below) stops the browser's own page-zoom
@@ -105,10 +162,20 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       : undefined;
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      ref={wrapperRef}
+      className={`flex h-full flex-col ${
+        isFullscreen ? "fixed inset-0 z-50 bg-black p-2" : ""
+      }`}
+    >
       <div
         ref={containerRef}
-        className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+        onClick={handleContainerClick}
+        className={`flex min-h-0 flex-1 items-center justify-center overflow-auto ${
+          isFullscreen
+            ? "bg-black"
+            : "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+        }`}
         style={{ touchAction: "pan-x pan-y" }}
       >
         <Document
@@ -136,7 +203,13 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         </Document>
       </div>
 
-      <div className="mt-4 shrink-0 flex flex-wrap items-center justify-center gap-4">
+      <div
+        className={`shrink-0 flex flex-wrap items-center justify-center gap-4 ${
+          isFullscreen
+            ? "mt-2 text-zinc-200 [&_button]:border-zinc-600 [&_span]:text-zinc-300"
+            : "mt-4"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -197,6 +270,14 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
             </button>
           </div>
         ) : null}
+
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+        >
+          {isFullscreen ? "全画面を終了" : "全画面"}
+        </button>
       </div>
     </div>
   );
