@@ -47,6 +47,8 @@ export default function Slideshow() {
     exit: exitFullscreen,
   } = useFullscreen<HTMLDivElement>();
   const advancingRef = useRef(false);
+  // 送りボタンの「読み込み中」表示用（二重送りの防止自体は advancingRef で行う）。
+  const [isAdvancing, setIsAdvancing] = useState(false);
   // 1秒ごとの tick から最新の値を読むための ref（state と同時に更新する）。
   const deadlineRef = useRef(0);
   const slideIdRef = useRef<string | null>(null);
@@ -59,6 +61,7 @@ export default function Slideshow() {
   const advance = useCallback(async (fromId: string | null, direction: 1 | -1 = 1) => {
     if (advancingRef.current) return;
     advancingRef.current = true;
+    setIsAdvancing(true);
     try {
       const next = await getNextSlide(fromId, direction);
       const fetchedAt = Date.now();
@@ -83,6 +86,7 @@ export default function Slideshow() {
       scheduleAt(failedAt + RETRY_MS);
     } finally {
       advancingRef.current = false;
+      setIsAdvancing(false);
     }
   }, [scheduleAt]);
 
@@ -141,7 +145,7 @@ export default function Slideshow() {
         isFullscreen ? "fixed inset-0 z-50 bg-black" : "px-4 py-4"
       }`}
     >
-      {/* 全画面中はヘッダーを隠し、終了ボタンと前後の送りボタンだけを小さく重ねる（自動送りはそのまま続く）。 */}
+      {/* 全画面中はヘッダーを隠し、終了ボタンと資料番号だけを重ねる（前後の送りボタンはスライドの左右に常に出す。自動送りはそのまま続く）。 */}
       {isFullscreen && (
         <>
           <button
@@ -152,26 +156,8 @@ export default function Slideshow() {
             全画面を終了
           </button>
           {slide && status === "ready" && (
-            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 px-3 py-2 text-sm text-zinc-200 opacity-60 hover:opacity-100">
-              <button
-                type="button"
-                onClick={() => void advance(slide.id, -1)}
-                aria-label="前の資料"
-                className="rounded-full px-4 py-2 text-lg hover:bg-white/10"
-              >
-                ◀ 前へ
-              </button>
-              <span className="tabular-nums">
-                {slide.position} / {slide.total}
-              </span>
-              <button
-                type="button"
-                onClick={() => void advance(slide.id, 1)}
-                aria-label="次の資料"
-                className="rounded-full px-4 py-2 text-lg hover:bg-white/10"
-              >
-                次へ ▶
-              </button>
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-base text-zinc-200 tabular-nums">
+              {slide.position} / {slide.total}
             </div>
           )}
         </>
@@ -218,20 +204,6 @@ export default function Slideshow() {
                 </span>
               )}
               <span className="tabular-nums">次まで {formatRemaining(remaining)}</span>
-              <button
-                type="button"
-                onClick={() => void advance(slide.id, -1)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 dark:border-zinc-700"
-              >
-                前へ
-              </button>
-              <button
-                type="button"
-                onClick={() => void advance(slide.id, 1)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 dark:border-zinc-700"
-              >
-                次へ
-              </button>
             </>
           )}
           <button
@@ -252,12 +224,28 @@ export default function Slideshow() {
 
       <div
         ref={containerRef}
-        className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
+        className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
           isFullscreen
             ? "bg-black"
             : "mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
         }`}
       >
+        {status === "ready" && slide && (
+          <>
+            <SlideNavButton
+              direction={-1}
+              large={isFullscreen}
+              disabled={isAdvancing}
+              onClick={() => void advance(slide.id, -1)}
+            />
+            <SlideNavButton
+              direction={1}
+              large={isFullscreen}
+              disabled={isAdvancing}
+              onClick={() => void advance(slide.id, 1)}
+            />
+          </>
+        )}
         {status === "loading" && <p className="text-zinc-500">読み込み中...</p>}
         {status === "empty" && (
           <p className="text-zinc-500 dark:text-zinc-400">
@@ -310,5 +298,48 @@ export default function Slideshow() {
         </div>
       )}
     </div>
+  );
+}
+
+// スライドの左右端に重ねる前後送りボタン。離れた位置やタッチ操作でも押しやすいよう大きめにする。
+function SlideNavButton({
+  direction,
+  large,
+  disabled,
+  onClick,
+}: {
+  direction: 1 | -1;
+  large: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const isNext = direction === 1;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={isNext ? "次の資料" : "前の資料"}
+      title={isNext ? "次の資料（→キー）" : "前の資料（←キー）"}
+      className={`absolute top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-2xl bg-zinc-900/60 text-white shadow-lg ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-zinc-900/85 active:scale-95 disabled:cursor-wait disabled:opacity-40 ${
+        isNext ? "right-3" : "left-3"
+      } ${large ? "px-4 py-6" : "px-3 py-4"}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className={large ? "h-12 w-12" : "h-9 w-9"}
+      >
+        <path d={isNext ? "M9 5l7 7-7 7" : "M15 5l-7 7 7 7"} />
+      </svg>
+      <span className={`font-medium ${large ? "text-base" : "text-sm"}`}>
+        {isNext ? "次へ" : "前へ"}
+      </span>
+    </button>
   );
 }
